@@ -52,6 +52,13 @@ public:
    */
   void Predict();
 
+   /**
+   * Runs a basic KF update iteration in place
+   * 
+   * @param y the error
+   */
+  void BasicKF(const Eigen::VectorXd &y);
+  
   /**
    * Updates the state by using standard Kalman Filter equations
    * @param z The measurement at k+1

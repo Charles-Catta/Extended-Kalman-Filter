@@ -7,6 +7,7 @@ using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
+#define SMALL_VALUE 0.0001
 
 /*
  * Constructor.
@@ -37,7 +38,7 @@ FusionEKF::FusionEKF() {
 */
 FusionEKF::~FusionEKF() {}
 
-Eigen::VectorXd FusionEKF::PolarToCartesian(const float rho, const float phi, const float drho_dt)
+Eigen::VectorXd FusionEKF::PolarToCartesian(const long rho, const long phi, const long drho_dt)
 {
   Eigen::VectorXd x = Eigen::VectorXd(4);
   x <<  rho * cos(phi),
@@ -51,29 +52,34 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   /*****************************************************************************
    *  Initialization
    ****************************************************************************/
-  if (is_initialized_ == false) {
+  if (!is_initialized_) {
     // State vector X => x, y, vx, vy
     ekf_.x_ = VectorXd(4);
 
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-      float rho = measurement_pack.raw_measurements_[0];
-      float phi = measurement_pack.raw_measurements_[1];
-      float drho_dt = measurement_pack.raw_measurements_[2];
+      long rho = measurement_pack.raw_measurements_[0];
+      long phi = measurement_pack.raw_measurements_[1];
+      long drho_dt = measurement_pack.raw_measurements_[2];
       ekf_.x_ = PolarToCartesian(rho, phi, drho_dt);
     }
     else  {
+      // LIDAR
       ekf_.x_ <<  measurement_pack.raw_measurements_[0],
                   measurement_pack.raw_measurements_[1],
                   0,
                   0;
     }
-
+    if (fabs(ekf_.x_(0)) < SMALL_VALUE && fabs(ekf_.x_(1)) < SMALL_VALUE)
+    {
+      ekf_.x_(0) = SMALL_VALUE;
+      ekf_.x_(1) = SMALL_VALUE;
+    }
     // State covariance matrix P 
     ekf_.P_ = MatrixXd(4, 4);
-    ekf_.P_ <<  1, 0, 0, 0,
-                0, 1, 0, 0,
+    ekf_.P_ <<  1, 0, 0,    0,
+                0, 1, 0,    0,
                 0, 0, 1000, 0,
-                0, 0, 0, 1000;
+                0, 0, 0,    1000;
     
     // Transition matrix F, the values at (1, 3) and (2, 4) will correspond to dt after first update
     ekf_.F_ = MatrixXd(4, 4);
@@ -81,6 +87,9 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
                 0, 1, 0, 1,
                 0, 0, 1, 0,
                 0, 0, 0, 1;
+
+    previous_timestamp_ = measurement_pack.timestamp_;
+
     // done initializing, no need to predict or update
     is_initialized_ = true;
     return;
@@ -91,13 +100,15 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    ****************************************************************************/
 
   // Elapsed time between measurements dt in seconds
-  float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000;
+  long long dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000;
   previous_timestamp_ = measurement_pack.timestamp_;
 
   // dt at different powers
-  float dt_2 = dt * dt;
-  float dt_3 = dt_2 * dt;
-  float dt_4 = dt_3 * dt;
+  long long dt_2 = dt * dt;
+  long long dt_3 = dt_2 * dt;
+  long long dt_4 = dt_3 * dt;
+  long long dt_4_4 = dt_4 / 4;
+  long long dt_3_2 = dt_3 / 2;
 
   // Set noise components from task, values specified by project spec
   float noise_ax = 9.0;
@@ -109,10 +120,10 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
   // Compute process covariance matrix Q
   ekf_.Q_ = MatrixXd(4, 4);
-  ekf_.Q_ <<  dt_4/4*noise_ax,    0,               dt_3/2*noise_ax,   0,
-              0,                  dt_4/4*noise_ay, 0,                 dt_3/2*noise_ay,
-              dt_3/2*noise_ax,    0,               dt_2*noise_ax,     0,
-              0,                  dt_3/2*noise_ay, 0,                 dt_2*noise_ay;
+  ekf_.Q_ <<  dt_4_4 * noise_ax,    0,                  dt_3_2 * noise_ax,   0,
+              0,                    dt_4_4 * noise_ay,  0,                   dt_3_2 * noise_ay,
+              dt_3_2 * noise_ax,    0,                  dt_2 * noise_ax,     0,
+              0,                    dt_3_2 * noise_ay,  0,                   dt_2 * noise_ay;
   
   // Run prediction
   ekf_.Predict();

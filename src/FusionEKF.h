@@ -26,7 +26,7 @@ public:
   */
   void ProcessMeasurement(const MeasurementPackage &measurement_pack);
 
-  Eigen::VectorXd PolarToCartesian(float rho, float phi, float drho_dt);
+  Eigen::VectorXd PolarToCartesian(const long rho, const long phi, const long drho_dt);
 
   /**
   * Kalman Filter update and prediction math lives in here.

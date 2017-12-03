@@ -4,6 +4,7 @@
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
 using std::vector;
+static const float SMALL_VALUE  = 0.0001;
 
 Tools::Tools() {}
 
@@ -25,7 +26,7 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
     delta = delta.array() * delta.array();
     rmse += delta;
   }
-  rmse /= estimations.size();
+  rmse = rmse / estimations.size();
   rmse = rmse.array().sqrt();
   return rmse;
 }
@@ -33,22 +34,26 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
 MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) 
 {
   MatrixXd Hj(3, 4);
-  float px = x_state(0);
-  float py = x_state(1);
-  float vx = x_state(2);
-  float vy = x_state(3);
+  long px = x_state(0);
+  long py = x_state(1);
+  long vx = x_state(2);
+  long vy = x_state(3);
 
-  float c1 = px*px + py*py;
-  float c1_sqrt = sqrt(c1);
-  float c1_c1_sqrt = (c1*c1_sqrt);
+  long c0 = px * px + py * py;
+  long c1 = sqrt(c1);
+  long c2 = (c0 * c1);
 
-  if (fabs(c1) < 0.000001)
+  if (fabs(px) < SMALL_VALUE && fabs(py) < SMALL_VALUE)
   {
-    std::cerr << "jacobian division by zero" << std::endl;
-    return Hj;
+	  px = SMALL_VALUE;
+	  py = SMALL_VALUE;
   }
-  Hj <<  (px / c1_sqrt), (py / c1_sqrt), 0, 0,
-          -(py / c1), (px / c1), 0, 0,
-          py * (vx * py - vy * px) / c1_c1_sqrt, px * (px * vy - py * vx) / c1_c1_sqrt, px / c1_sqrt, py / c1_sqrt;
+  if (fabs(c0) < SMALL_VALUE)
+  {
+    c0 = SMALL_VALUE;
+  }
+  Hj <<  (px / c1),                               (py / c1),              0,          0,
+        -(py / c0),                               (px / c0),              0,          0,
+        py * (vx * py - vy * px) / c2,    px * (px * vy - py * vx) / c2,  px / c2,    py / c2;
   return Hj;
 }
