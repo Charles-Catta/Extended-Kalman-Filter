@@ -75,14 +75,17 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
       ekf_.x_ <<  cos(phi) * rho, 
                   sin(phi) * rho, 
-                  0, 
-                  0;
+                  drho_dt * cos(phi), 
+                  drho_dt * sin(phi);
     }
     else  if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
       ekf_.x_ <<  measurement_pack.raw_measurements_[0],
                   measurement_pack.raw_measurements_[1],
                   0,
                   0;
+    }
+    if (ekf_.x_(0) < 0.0001) {
+      ekf_.x_(0) = 0.0001;
     }
 
     previous_timestamp_ = measurement_pack.timestamp_;
@@ -98,6 +101,7 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
 
   // Elapsed time between measurements dt in seconds
   float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
+  cout << dt << endl;
   previous_timestamp_ = measurement_pack.timestamp_;
 
   // dt at different powers

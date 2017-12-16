@@ -32,17 +32,18 @@ void KalmanFilter::Update(const VectorXd &z) {
   MatrixXd H_transpose = H_.transpose();
   MatrixXd S = H_ * P_ * H_transpose + R_;
   MatrixXd K = P_ * H_transpose * S.inverse();
-  x_ += K * y;
+  x_ = x_ + K * y;
   // update
   P_ = (I - K * H_) * P_;
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-  float px, py, vx, vy, rho, phi, drho_dt;
-  px = x_[0];
-  py = x_[1];
-  vx = x_[2];
-  vy = x_[3];
+  double rho, phi, drho_dt;
+  float px, py, vx, vy;
+  px = x_(0);
+  py = x_(1);
+  vx = x_(2);
+  vy = x_(3);
   rho = sqrt(px * px + py*py);
   phi = atan2(py, px);
   if (rho < 0.0001)
@@ -53,17 +54,12 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   VectorXd prediction(3);
   prediction << rho, phi, drho_dt;
   VectorXd y = z - prediction;
-  while (y(1) > M_PI) {
-    y(1) -= 2 * M_PI;
-  }
-  while (y(1) < -M_PI) {
-    y(1) += 2 * M_PI;
-  }
+
   MatrixXd I = MatrixXd::Identity(x_.size(), x_.size());
   MatrixXd H_transpose = H_.transpose();
   MatrixXd S = H_ * P_ * H_transpose + R_;
   MatrixXd K = P_ * H_transpose * S.inverse();
-  x_ += K * y;
+  x_ = x_ + K * y;
   // update
   P_ = (I - K * H_) * P_;
 }
