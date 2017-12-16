@@ -7,7 +7,6 @@ using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using std::vector;
-#define SMALL_VALUE 0.0001
 
 /*
  * Constructor.
@@ -31,22 +30,35 @@ FusionEKF::FusionEKF() {
   R_radar_ << 0.09, 0, 0,
               0, 0.0009, 0,
               0, 0, 0.09;
+
+  // Measurement function H - radar
+  H_laser_ << 1, 0, 0, 0,
+              0, 1, 0, 0;
+  
+  // State covariance matrix P 
+  ekf_.P_ = MatrixXd(4, 4);
+  ekf_.P_ <<  1, 0, 0,    0,
+              0, 1, 0,    0,
+              0, 0, 1000, 0,
+              0, 0, 0,    1000;
+  
+  // Transition matrix F, 
+  // the values at (1, 3) and (2, 4) will correspond to dt after first update
+  ekf_.F_ = MatrixXd(4, 4);
+  ekf_.F_ <<  1, 0, 1, 0,
+              0, 1, 0, 1,
+              0, 0, 1, 0,
+              0, 0, 0, 1;
+
+  // Set noise components from task as per project spec
+  noise_ax = 9;
+  noise_ay = 9;
 }
 
 /**
 * Destructor.
 */
 FusionEKF::~FusionEKF() {}
-
-Eigen::VectorXd FusionEKF::PolarToCartesian(const long rho, const long phi, const long drho_dt)
-{
-  Eigen::VectorXd x = Eigen::VectorXd(4);
-  x <<  rho * cos(phi),
-        rho * sin(phi),
-        drho_dt * cos(phi),
-        drho_dt * sin(phi);
-  return x;
-}
 
 void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
   /*****************************************************************************
@@ -57,36 +69,21 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
     ekf_.x_ = VectorXd(4);
 
     if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
-      long rho = measurement_pack.raw_measurements_[0];
-      long phi = measurement_pack.raw_measurements_[1];
-      long drho_dt = measurement_pack.raw_measurements_[2];
-      ekf_.x_ = PolarToCartesian(rho, phi, drho_dt);
+      float rho = measurement_pack.raw_measurements_[0];
+      float phi = measurement_pack.raw_measurements_[1];
+      float drho_dt = measurement_pack.raw_measurements_[2];
+
+      ekf_.x_ <<  cos(phi) * rho, 
+                  sin(phi) * rho, 
+                  0, 
+                  0;
     }
-    else  {
-      // LIDAR
+    else  if (measurement_pack.sensor_type_ == MeasurementPackage::LASER) {
       ekf_.x_ <<  measurement_pack.raw_measurements_[0],
                   measurement_pack.raw_measurements_[1],
                   0,
                   0;
     }
-    if (fabs(ekf_.x_(0)) < SMALL_VALUE && fabs(ekf_.x_(1)) < SMALL_VALUE)
-    {
-      ekf_.x_(0) = SMALL_VALUE;
-      ekf_.x_(1) = SMALL_VALUE;
-    }
-    // State covariance matrix P 
-    ekf_.P_ = MatrixXd(4, 4);
-    ekf_.P_ <<  1, 0, 0,    0,
-                0, 1, 0,    0,
-                0, 0, 1000, 0,
-                0, 0, 0,    1000;
-    
-    // Transition matrix F, the values at (1, 3) and (2, 4) will correspond to dt after first update
-    ekf_.F_ = MatrixXd(4, 4);
-    ekf_.F_ <<  1, 0, 1, 0,
-                0, 1, 0, 1,
-                0, 0, 1, 0,
-                0, 0, 0, 1;
 
     previous_timestamp_ = measurement_pack.timestamp_;
 
@@ -100,19 +97,16 @@ void FusionEKF::ProcessMeasurement(const MeasurementPackage &measurement_pack) {
    ****************************************************************************/
 
   // Elapsed time between measurements dt in seconds
-  long long dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000;
+  float dt = (measurement_pack.timestamp_ - previous_timestamp_) / 1000000.0;
   previous_timestamp_ = measurement_pack.timestamp_;
 
   // dt at different powers
-  long long dt_2 = dt * dt;
-  long long dt_3 = dt_2 * dt;
-  long long dt_4 = dt_3 * dt;
-  long long dt_4_4 = dt_4 / 4;
-  long long dt_3_2 = dt_3 / 2;
+  float dt_2 = dt * dt;
+  float dt_3 = dt_2 * dt;
+  float dt_4 = dt_3 * dt;
+  float dt_4_4 = dt_4 / 4;
+  float dt_3_2 = dt_3 / 2;
 
-  // Set noise components from task, values specified by project spec
-  float noise_ax = 9.0;
-  float noise_ay = 9.0;
 
   // Update state transition matrix F with dt
   ekf_.F_(0, 2) = dt;

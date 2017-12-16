@@ -4,7 +4,6 @@
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
 using std::vector;
-static const float SMALL_VALUE  = 0.0001;
 
 Tools::Tools() {}
 
@@ -34,23 +33,21 @@ VectorXd Tools::CalculateRMSE(const vector<VectorXd> &estimations,
 MatrixXd Tools::CalculateJacobian(const VectorXd& x_state) 
 {
   MatrixXd Hj(3, 4);
-  long px = x_state(0);
-  long py = x_state(1);
-  long vx = x_state(2);
-  long vy = x_state(3);
+  Hj << 0, 0, 0, 0,
+        0, 0, 0, 0,
+        0, 0, 0, 0;
+  float px = x_state(0);
+  float py = x_state(1);
+  float vx = x_state(2);
+  float vy = x_state(3);
 
-  long c0 = px * px + py * py;
-  long c1 = sqrt(c1);
-  long c2 = (c0 * c1);
+  float c0 = px * px + py * py;
+  float c1 = sqrt(c1);
+  float c2 = (c0 * c1);
 
-  if (fabs(px) < SMALL_VALUE && fabs(py) < SMALL_VALUE)
+  if (fabs(c1) < 0.0001)
   {
-	  px = SMALL_VALUE;
-	  py = SMALL_VALUE;
-  }
-  if (fabs(c0) < SMALL_VALUE)
-  {
-    c0 = SMALL_VALUE;
+    return Hj;
   }
   Hj <<  (px / c1),                               (py / c1),              0,          0,
         -(py / c0),                               (px / c0),              0,          0,
