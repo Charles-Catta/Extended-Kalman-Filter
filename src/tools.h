@@ -3,6 +3,9 @@
 #include <vector>
 #include "Eigen/Dense"
 
+const float PI = 3.14159265359;
+const float EPSILON = 0.00001;
+
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using namespace std;

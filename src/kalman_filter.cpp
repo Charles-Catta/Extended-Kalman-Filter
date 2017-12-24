@@ -1,10 +1,13 @@
 #include "kalman_filter.h"
 #include <iostream>
 #include <math.h>
+#include "tools.h"
 
 using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
+
+const float PI2 = 2 * M_PI;
 
 KalmanFilter::KalmanFilter() {}
 
@@ -27,39 +30,49 @@ void KalmanFilter::Predict() {
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
-  VectorXd y = z - H_ * x_;
-  MatrixXd I = MatrixXd::Identity(x_.size(), x_.size());
-  MatrixXd H_transpose = H_.transpose();
-  MatrixXd S = H_ * P_ * H_transpose + R_;
-  MatrixXd K = P_ * H_transpose * S.inverse();
-  x_ = x_ + K * y;
-  // update
-  P_ = (I - K * H_) * P_;
+  VectorXd z_pred = H_ * x_;
+  VectorXd y = z - z_pred;
+  BasicKF(y);
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
-  double rho, phi, drho_dt;
   float px, py, vx, vy;
   px = x_(0);
   py = x_(1);
   vx = x_(2);
   vy = x_(3);
-  rho = sqrt(px * px + py*py);
-  phi = atan2(py, px);
-  if (rho < 0.0001)
+  float rho = sqrt(px * px + py * py);
+  float phi = atan2(py, px);
+
+  while(phi > M_PI){
+    phi -= PI2;
+  }
+
+  while(phi < -M_PI){
+    phi += PI2;
+  }
+
+  if (rho < EPSILON)
   {
-    rho = 0.0001;
+    rho = EPSILON;
   } 
-  drho_dt = (px * vx + py * vy) / rho;
+  float drho_dt = (px * vx + py * vy) / rho;
   VectorXd prediction(3);
   prediction << rho, phi, drho_dt;
-  VectorXd y = z - prediction;
+  VectorXd z_pred = H_ * x_;
+  VectorXd y = z - z_pred;
+  BasicKF(y);
+}
 
-  MatrixXd I = MatrixXd::Identity(x_.size(), x_.size());
+void KalmanFilter::BasicKF(const VectorXd &y) {
   MatrixXd H_transpose = H_.transpose();
   MatrixXd S = H_ * P_ * H_transpose + R_;
-  MatrixXd K = P_ * H_transpose * S.inverse();
-  x_ = x_ + K * y;
+  MatrixXd S_inv = S.inverse();
+  MatrixXd K = P_ * H_transpose * S_inv;
+
   // update
+  x_ = x_ + (K * y);
+  int x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = (I - K * H_) * P_;
 }
