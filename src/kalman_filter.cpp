@@ -44,23 +44,23 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   float rho = sqrt(px * px + py * py);
   float phi = atan2(py, px);
 
-  while(phi > M_PI){
-    phi -= PI2;
-  }
 
-  while(phi < -M_PI){
-    phi += PI2;
-  }
-
-  if (rho < EPSILON)
-  {
+  if (rho < EPSILON) {
     rho = EPSILON;
   } 
   float drho_dt = (px * vx + py * vy) / rho;
   VectorXd prediction(3);
   prediction << rho, phi, drho_dt;
   VectorXd z_pred = H_ * x_;
-  VectorXd y = z - z_pred;
+  VectorXd y = z - prediction;
+
+  while(y(1) > M_PI) {
+    y(1) -= PI2;
+  }
+
+  while(phi < -M_PI) {
+    y(1) += PI2;
+  }
   BasicKF(y);
 }
 
